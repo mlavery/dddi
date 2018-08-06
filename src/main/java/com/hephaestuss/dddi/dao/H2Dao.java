@@ -3,13 +3,11 @@ package com.hephaestuss.dddi.dao;
 import com.hephaestuss.dddi.documents.CustomerH2;
 import com.hephaestuss.dddi.model.Customer;
 import com.hephaestuss.dddi.repositories.CustomerH2Repository;
-import io.reactivex.Completable;
-import io.reactivex.Observable;
-import io.reactivex.Single;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -22,25 +20,23 @@ public class H2Dao implements CustomerDao {
     }
 
     @Override
-    public Single<Customer> getCustomerById(String customerId) {
-        return Observable
+    public Mono<Customer> getCustomerById(String customerId) {
+        return Mono
                 .just(repository.findById(Long.parseLong(customerId)))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
-                .map(this::convertCustomer)
-                .first(new Customer());
+                .map(this::convertCustomer);
     }
 
     @Override
-    public Single<List<Customer>> getAllCustomers() {
-        return Observable
+    public Flux<Customer> getAllCustomers() {
+        return Flux
                 .fromIterable(repository.findAll())
-                .map(this::convertCustomer)
-                .toList();
+                .map(this::convertCustomer);
     }
 
     @Override
-    public Completable saveCustomer(Customer customer) {
+    public Mono saveCustomer(Customer customer) {
         CustomerH2 updateCustomer;
         if(customer.getId().isPresent()) {
             Optional<CustomerH2> customerH2 = repository.findById( Long.parseLong(customer.getId().get()));
@@ -55,7 +51,7 @@ public class H2Dao implements CustomerDao {
         } else {
             updateCustomer = new CustomerH2(customer);
         }
-        return Completable.fromAction(() -> repository.save(updateCustomer));
+        return Mono.just(repository.save(updateCustomer));
 
     }
 

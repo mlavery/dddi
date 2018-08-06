@@ -2,12 +2,13 @@ package com.hephaestuss.dddi.documents;
 
 import com.hephaestuss.dddi.dao.CustomerDao;
 import com.hephaestuss.dddi.model.Customer;
-import io.reactivex.Single;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
 import javax.persistence.*;
-import java.util.List;
 
 @Entity
 public class Company implements ApplicationContextAware {
@@ -51,11 +52,11 @@ public class Company implements ApplicationContextAware {
         return new StringBuilder().append(name).append(" ").append(dao).toString();
     }
 
-    public Single<List<Customer>> getAllCustomers() {
+    public Flux<Customer> getAllCustomers() {
         return retriever.getAllCustomers();
     }
 
-    public Single<Customer> findCustomerById(String customerId) {
+    public Mono<Customer> findCustomerById(String customerId) {
         return retriever.getCustomerById(customerId);
     }
 

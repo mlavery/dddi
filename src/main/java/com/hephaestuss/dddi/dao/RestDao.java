@@ -2,16 +2,18 @@ package com.hephaestuss.dddi.dao;
 
 import com.hephaestuss.dddi.model.Customer;
 import com.hephaestuss.dddi.model.CustomerRest;
-import io.reactivex.Completable;
-import io.reactivex.Observable;
-import io.reactivex.Single;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
+import org.springframework.web.reactive.socket.client.WebSocketClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -23,7 +25,7 @@ import java.util.stream.Collectors;
 public class RestDao implements CustomerDao {
 
     @Override
-    public Single<Customer> getCustomerById(String customerId) {
+    public Mono<Customer> getCustomerById(String customerId) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Accept", MediaType.APPLICATION_JSON_VALUE);
         RestTemplate restTemplate = new RestTemplate();
@@ -31,23 +33,24 @@ public class RestDao implements CustomerDao {
         params.put("customerId", customerId);
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl("http://localhost:8090/v1/customerByCustomerId/");
         builder.queryParam("customerId", customerId);
-        return Observable
+        return Mono
                 .just(restTemplate.exchange(builder.toUriString(), HttpMethod.GET, new HttpEntity(headers), CustomerRest.class).getBody())
-                .map(RestDao::convertCustomer)
-                .first(new Customer());
+                .map(RestDao::convertCustomer);
     }
 
     @Override
-    public Single<List<Customer>> getAllCustomers() {
-        RestTemplate restTemplate = new RestTemplate();
-        return Observable
-                .fromIterable(restTemplate.getForObject("http://localhost:8090/v1/customers", List.class))
-                .map(c -> RestDao.convertCustomer((LinkedHashMap) c))
-                .toList();
+    public Flux<Customer> getAllCustomers() {
+        WebClient webClient = WebClient.create("http://localhost:8090");
+
+        return webClient
+            .method(HttpMethod.GET)
+            .uri("/v1/customers")
+            .retrieve()
+            .bodyToFlux(Customer.class);
     }
 
     @Override
-    public Completable saveCustomer(Customer customer) {
+    public Mono saveCustomer(Customer customer) {
         throw new RuntimeException("Cannot save users for this Company");
     }
 

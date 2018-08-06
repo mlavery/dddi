@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 
@@ -22,12 +23,15 @@ public class CompanyService implements ApplicationContextAware {
         this.companyRepository = companyRepository;
     }
 
-    public Optional<Company> getCompany(Long id) {
-        Optional<Company> company = companyRepository.findById(id);
-        company.ifPresent(
-                company1 -> company1.retriever = (CustomerDao) appCtx.getBean(company1.getDao())
-        );
-        return company;
+    public Mono<Company> getCompany(Long id) {
+        return Mono.just(companyRepository.findById(id))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .map(company -> {
+                company.retriever = (CustomerDao) appCtx.getBean(company.getDao());
+                    return company;
+                }
+            );
     }
 
     @Override

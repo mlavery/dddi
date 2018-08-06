@@ -7,10 +7,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
 import java.util.*;
 
+import static org.springframework.http.MediaType.APPLICATION_STREAM_JSON_VALUE;
 import static org.springframework.web.bind.annotation.RequestMethod.GET;
 import static org.springframework.web.bind.annotation.RequestMethod.PUT;
 
@@ -24,21 +27,20 @@ class CustomerController {
     }
 
     @ResponseBody
-    @RequestMapping(path = "/v1/customerByCustomerId", method = GET)
-    public CustomerRest getCustomersById(@Valid String customerId) {
-        return customers.get(customerId);
+    @RequestMapping(path = "/v1/customerByCustomerId", method = GET, produces = APPLICATION_STREAM_JSON_VALUE)
+    public Mono<CustomerRest> getCustomersById(@Valid String customerId) {
+        return Mono.just(customers.get(customerId));
     }
 
     @ResponseBody
-    @RequestMapping(path = "/v1/customers", method = GET)
-    public List<CustomerRest> getRestCustomers() {
-        return new ArrayList<>(customers.values());
+    @RequestMapping(path = "/v1/customers", method = GET, produces = APPLICATION_STREAM_JSON_VALUE)
+    public Flux<CustomerRest> getRestCustomers() { return Flux.fromIterable(new ArrayList<>(customers.values()));
     }
 
     @ResponseBody
     @RequestMapping(path = "/v1/customer", method = PUT)
-    public ResponseEntity saveRestCustomers(Customer customer) {
-        return new ResponseEntity(HttpStatus.NOT_FOUND);
+    public Mono<ResponseEntity> saveRestCustomers(Customer customer) {
+        return Mono.just(new ResponseEntity(HttpStatus.NOT_FOUND));
     }
 
 }

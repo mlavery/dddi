@@ -1,16 +1,14 @@
 package com.hephaestuss.dddi.dao;
 
 import com.hephaestuss.dddi.model.Customer;
-import io.reactivex.Completable;
-import io.reactivex.Single;
-
-import java.util.List;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public interface CustomerDao {
 
-    Single<Customer> getCustomerById(String customerId);
+    Mono<Customer> getCustomerById(String customerId);
 
-    Single<List<Customer>> getAllCustomers();
+    Flux<Customer> getAllCustomers();
 
-    Completable saveCustomer(Customer customer);
+    Mono saveCustomer(Customer customer);
 }

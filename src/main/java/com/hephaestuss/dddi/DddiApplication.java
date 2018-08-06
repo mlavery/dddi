@@ -13,6 +13,7 @@ import com.hephaestuss.dddi.repositories.CompanyRepository;
 import com.hephaestuss.dddi.repositories.CustomerH2Repository;
 import com.hephaestuss.dddi.repositories.CustomerMongoRepository;
 import com.hephaestuss.dddi.services.CompanyService;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +23,10 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import reactor.core.publisher.BaseSubscriber;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 @SpringBootApplication
@@ -69,85 +72,107 @@ public class DddiApplication implements CommandLineRunner {
         populateMongoData(mongoCompany.id);
         populateH2Data(companySave.id);
 
-        mongoCompany = companyService.getCompany(mongoCompany.id).get();
-        final Company company = companyService.getCompany(companySave.id).get();
+        mongoCompany = companyService.getCompany(mongoCompany.id).block();
+        final Company company = companyService.getCompany(companySave.id).block();
 
         /*
         Retrieve static customers from Rest endpoint
          */
-        log.info("--- Rest Customers ---");
-        restDao.getAllCustomers().subscribe(
-                customers -> customers.forEach(c -> log.info(c.toString())),
-                throwable -> {
-                    // Do something complicated
-                });
+        restDao.getAllCustomers().buffer(5).subscribe(customers -> {
+            log.info("--- Rest Customers ---");
+            customers.forEach(c -> log.info("Rest: " + c.toString()));
+        },
+        throwable -> {
+            // Do something complicated
+        });
+
+        restDao.getAllCustomers()
+            .buffer(5)
+            .toStream()
+            .flatMap(List::stream)
+            .map(Object::toString)
+            .forEach(c -> log.info("Rest Stream: " + c));
 
         /*
         Retrieve Mongo customers
          */
         log.info("--- Mongo Customers ---");
-        companyService.getCompany(mongoCompany.id).get().getAllCustomers().subscribe(customers -> {
-            customers.stream().map(Customer::toString).forEach(log::info);
-            log.info("Find by Name: " +
-                mongoDao.getCustomerById("mongo", "read")
-                    .blockingGet()
-                    .stream()
-                    .findFirst()
-                    .get()
-                    .toString());
-        }, throwable -> log.error(throwable.getLocalizedMessage()));
+        companyService.getCompany(mongoCompany.id).subscribe(c ->
+            company.getAllCustomers().toStream().forEach(customer -> {
+                log.info(customer.toString());
+                log.info("Find by Name: " +
+                mongoDao.getCustomerById("mongo", "read").toString());
+            })
+            ,throwable -> log.error(throwable.getLocalizedMessage()));
+
+        log.info("--- Mongo Customers With Backpressure---");
+        companyService.getCompany(mongoCompany.id).subscribe(c ->
+            company.getAllCustomers().buffer(10).subscribe(new BaseSubscriber<List<Customer>>() {
+                @Override
+                protected void hookOnSubscribe(Subscription subscription) {
+                    request(10);
+                }
+                @Override
+                protected void hookOnNext(List<Customer> customers) {
+                    customers.forEach(customer -> {
+                        log.info(customer.toString());
+                        log.info("Find by Name: " + mongoDao.getCustomerById("mongo", "read").toString());
+                        request(10);
+                    });
+                }
+            }));
 
         /*
         Retreieve customer from H2
          */
         log.info("--- H2 Customers ---");
         company.findCustomerById("4")
-                .subscribe(customer -> {
-                        log.info("H2 Customer: " + customer.toString());
+            .subscribe(customer -> {
+                log.info("H2 Customer: " + customer.toString());
 
-                        /*
-                        Save the H2 Customer
-                        */
-                        customer.setFirstName("NameChanged");
-                        customer.saveCustomer().subscribe(() -> {
-                                // Do nothing
-                            },
-                            throwable -> log.error("Error saving customer")
-                        );
-                        company.findCustomerById("4")
-                                .subscribe( c -> log.info("H2 Customer Name Changed: " + c.toString()),
-                                throwable ->  log.error(throwable.getLocalizedMessage())
-                        );
+                /*
+                Save the H2 Customer
+                */
+                customer.setFirstName("NameChanged");
+                customer.saveCustomer().subscribe(object -> {
+                        // Do nothing
                     },
-                    throwable -> log.error(throwable.getLocalizedMessage())
+                    throwable -> log.error("Error saving customer")
                 );
-        company.getAllCustomers().subscribe(customers -> customers.stream().map(Customer::toString).forEach(log::info));
+                company.findCustomerById("4")
+                    .subscribe( c -> log.info("H2 Customer Name Changed: " + c.toString()),
+                    throwable ->  log.error(throwable.getLocalizedMessage())
+                );
+            },
+            throwable -> log.error(throwable.getLocalizedMessage())
+        );
+        company.getAllCustomers().buffer(5).subscribe(customer -> log.info(customer.toString()));
 
         /*
         Use CustomerFactory
          */
         log.info("---Customer Factory ---");
         customerFactory.findById("1")
-            .subscribe(maybes -> maybes.forEach(
-                    c -> c.subscribe(
-                            cus -> log.info("Customer Factory found user: " + cus.toString())
-                        )
-                    ),
+            .subscribe(mono -> mono.subscribe(c ->
+                log.info("Customer Factory found user: " + c.toString())
+            ),
             throwable -> log.error(throwable.getLocalizedMessage())
         );
 
         log.info("\n---Finished---");
+        System.exit(1);
     }
 
     private void populateRandomData(CustomerDao dao, Long companyId) {
-        for(int i = 0; i < 3; i++)
+        for(int i = 0; i < 3; i++) {
             new Customer(
-                    null,
-                    UUID.randomUUID().toString(),
-                    UUID.randomUUID().toString(),
-                    companyId
-            ).setDao(dao)
-            .saveCustomer().blockingGet();
+                null,
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                companyId)
+            .setDao(dao)
+            .saveCustomer().block();
+        }
     }
 
     private void populateMongoData(Long companyId) {

@@ -1,7 +1,7 @@
 package com.hephaestuss.dddi.model;
 
 import com.hephaestuss.dddi.dao.CustomerDao;
-import io.reactivex.Completable;
+import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 
@@ -57,7 +57,7 @@ public class Customer {
         return this;
     }
 
-    public Completable saveCustomer() {
+    public Mono saveCustomer() {
         return customerDao.saveCustomer(this);
     }
 

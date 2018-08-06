@@ -2,11 +2,10 @@ package com.hephaestuss.dddi.factory;
 
 import com.hephaestuss.dddi.dao.CustomerDao;
 import com.hephaestuss.dddi.model.Customer;
-import io.reactivex.Maybe;
-import io.reactivex.Observable;
-import io.reactivex.Single;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -18,11 +17,10 @@ public class CustomerFactory {
         this.customerDaoList = customerDaos;
     }
 
-    public Single<List<Maybe<Customer>>> findById(String id) {
-        return Observable.fromIterable(customerDaoList)
+    public Flux<Mono<Customer>> findById(String id) {
+        return Flux.fromIterable(customerDaoList)
                 .map(dao -> dao.getCustomerById(id)
                         .filter(Customer::notNull)
-                        .map(c -> c.setDao(dao)))
-                .toList();
+                        .map(c -> c.setDao(dao)));
     }
 }
